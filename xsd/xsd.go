@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+// XML primitives https://www.w3.org/TR/xmlschema11-2
+
 type Date time.Time
 
 func (t *Date) UnmarshalText(text []byte) error {

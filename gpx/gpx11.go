@@ -10,167 +10,231 @@ import (
 	"github.com/sio4/geo/xsd"
 )
 
-// Two lat/lon pairs defining the extent of an element.
-type BoundsType struct {
-	Minlat float64 `xml:"minlat,attr"`
-	Minlon float64 `xml:"minlon,attr"`
-	Maxlat float64 `xml:"maxlat,attr"`
-	Maxlon float64 `xml:"maxlon,attr"`
-}
+// Type of GPS fix. none means GPS had no fix. To signify "the fix info is
+// unknown, leave out fixType entirely. pps = military signal used
+const (
+	FixNone Fix = "none"
+	Fix2D   Fix = "2d"
+	Fix3D   Fix = "3d"
+	FixDGPS Fix = "dgps"
+	FixPPS  Fix = "pps" // a military signal was used
+)
 
-// Information about the copyright holder and any license governing use of this file.  By linking to an appropriate license,
-// you may place your data into the public domain or grant additional usage rights.
-type CopyrightType struct {
-	Year    time.Time `xml:"http://www.topografix.com/GPX/1/1 year,omitempty"`
-	License string    `xml:"http://www.topografix.com/GPX/1/1 license,omitempty"`
-	Author  string    `xml:"author,attr"`
-}
-
-func (t *CopyrightType) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	type T CopyrightType
-	var layout struct {
-		*T
-		Year *xsd.GYear `xml:"http://www.topografix.com/GPX/1/1 year,omitempty"`
-	}
-	layout.T = (*T)(t)
-	layout.Year = (*xsd.GYear)(&layout.T.Year)
-	return e.EncodeElement(layout, start)
-}
-
-func (t *CopyrightType) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	type T CopyrightType
-	var overlay struct {
-		*T
-		Year *xsd.GYear `xml:"http://www.topografix.com/GPX/1/1 year,omitempty"`
-	}
-	overlay.T = (*T)(t)
-	overlay.Year = (*xsd.GYear)(&overlay.T.Year)
-	return d.DecodeElement(&overlay, &start)
-}
-
-// An email address.  Broken into two parts (id and domain) to help prevent email harvesting.
-type EmailType struct {
-	Domain string `xml:"domain,attr"`
-}
-
-// You can add extend GPX by adding your own elements from another schema here.
-type ExtensionsType []string
-
-func (a ExtensionsType) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	var output struct {
-		ArrayType string   `xml:"http://schemas.xmlsoap.org/wsdl/ arrayType,attr"`
-		Items     []string `xml:" item"`
-	}
-	output.Items = []string(a)
-	start.Attr = append(start.Attr, xml.Attr{Name: xml.Name{"", "xmlns:ns1"}, Value: "http://www.w3.org/2001/XMLSchema"})
-	output.ArrayType = "ns1:anyType[]"
-	return e.EncodeElement(&output, start)
-}
-
-func (a *ExtensionsType) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err error) {
-	var tok xml.Token
-	for tok, err = d.Token(); err == nil; tok, err = d.Token() {
-		if tok, ok := tok.(xml.StartElement); ok {
-			var item string
-			if err = d.DecodeElement(&item, &tok); err == nil {
-				*a = append(*a, item)
-			}
-		}
-		if _, ok := tok.(xml.EndElement); ok {
-			break
-		}
-	}
-	return err
-}
-
-// May be one of none, 2d, 3d, dgps, pps
-type FixType string
-
-// GPX documents contain a metadata header, followed by waypoints, routes, and tracks.  You can add your own elements
-// to the extensions section of the GPX document.
-type GpxType struct {
-	Metadata   MetadataType   `xml:"http://www.topografix.com/GPX/1/1 metadata,omitempty"`
-	Wpt        []WptType      `xml:"http://www.topografix.com/GPX/1/1 wpt,omitempty"`
-	Rte        []RteType      `xml:"http://www.topografix.com/GPX/1/1 rte,omitempty"`
-	Trk        []TrkType      `xml:"http://www.topografix.com/GPX/1/1 trk,omitempty"`
-	Extensions ExtensionsType `xml:"http://www.topografix.com/GPX/1/1 extensions,omitempty"`
+// GPX documents contain a metadata header, followed by waypoints, routes, and
+// tracks.  You can add your own elements to the extensions section of the GPX
+// document.
+type GPX struct {
+	XMLName    xml.Name       `xml:"http://www.topografix.com/GPX/1/1 gpx"`
 	Version    string         `xml:"version,attr"`
 	Creator    string         `xml:"creator,attr"`
+	Metadata   *Metadata      `xml:"metadata,omitempty"`
+	Wpt        []Wpt          `xml:"wpt,omitempty"`
+	Rte        []Rte          `xml:"rte,omitempty"`
+	Trk        []Trk          `xml:"trk,omitempty"`
+	Extensions xsd.Extensions `xml:"extensions,omitempty"`
 }
 
-// A link to an external resource (Web page, digital photo, video clip, etc) with additional information.
-type LinkType struct {
-	Text string `xml:"http://www.topografix.com/GPX/1/1 text,omitempty"`
-	Type string `xml:"http://www.topografix.com/GPX/1/1 type,omitempty"`
+// Information about the GPX file, author, and copyright restrictions goes in
+// the metadata section.  Providing rich, meaningful information about your
+// GPX files allows others to search for and use your GPS data.
+type Metadata struct {
+	Name       string         `xml:"name,omitempty"`
+	Desc       string         `xml:"desc,omitempty"`
+	Author     *Person        `xml:"author,omitempty"`
+	Copyright  *Copyright     `xml:"copyright,omitempty"`
+	Link       []Link         `xml:"link,omitempty"`
+	Time       time.Time      `xml:"time,omitempty"`
+	Keywords   string         `xml:"keywords,omitempty"`
+	Bounds     *Bounds        `xml:"bounds,omitempty"`
+	Extensions xsd.Extensions `xml:"extensions,omitempty"`
 }
 
-// Information about the GPX file, author, and copyright restrictions goes in the metadata section.  Providing rich,
-// meaningful information about your GPX files allows others to search for and use your GPS data.
-type MetadataType struct {
-	Name       string         `xml:"http://www.topografix.com/GPX/1/1 name,omitempty"`
-	Desc       string         `xml:"http://www.topografix.com/GPX/1/1 desc,omitempty"`
-	Author     PersonType     `xml:"http://www.topografix.com/GPX/1/1 author,omitempty"`
-	Copyright  CopyrightType  `xml:"http://www.topografix.com/GPX/1/1 copyright,omitempty"`
-	Link       []LinkType     `xml:"http://www.topografix.com/GPX/1/1 link,omitempty"`
-	Time       time.Time      `xml:"http://www.topografix.com/GPX/1/1 time,omitempty"`
-	Keywords   string         `xml:"http://www.topografix.com/GPX/1/1 keywords,omitempty"`
-	Bounds     BoundsType     `xml:"http://www.topografix.com/GPX/1/1 bounds,omitempty"`
-	Extensions ExtensionsType `xml:"http://www.topografix.com/GPX/1/1 extensions,omitempty"`
-}
-
-func (t *MetadataType) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	type T MetadataType
+func (t *Metadata) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	type T Metadata
 	var layout struct {
 		*T
-		Time *xsd.DateTime `xml:"http://www.topografix.com/GPX/1/1 time,omitempty"`
+		Time *xsd.DateTime `xml:"time,omitempty"`
 	}
 	layout.T = (*T)(t)
 	layout.Time = (*xsd.DateTime)(&layout.T.Time)
 	return e.EncodeElement(layout, start)
 }
 
-func (t *MetadataType) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	type T MetadataType
+func (t *Metadata) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	type T Metadata
 	var overlay struct {
 		*T
-		Time *xsd.DateTime `xml:"http://www.topografix.com/GPX/1/1 time,omitempty"`
+		Time *xsd.DateTime `xml:"time,omitempty"`
 	}
 	overlay.T = (*T)(t)
 	overlay.Time = (*xsd.DateTime)(&overlay.T.Time)
 	return d.DecodeElement(&overlay, &start)
 }
 
-// A person or organization.
-type PersonType struct {
-	Name  string    `xml:"http://www.topografix.com/GPX/1/1 name,omitempty"`
-	Email EmailType `xml:"http://www.topografix.com/GPX/1/1 email,omitempty"`
-	Link  LinkType  `xml:"http://www.topografix.com/GPX/1/1 link,omitempty"`
+// wpt represents a waypoint, point of interest, or named feature on a map.
+type Wpt struct {
+	Lat          Latitude       `xml:"lat,attr"`
+	Lon          Longitude      `xml:"lon,attr"`
+	Ele          float64        `xml:"ele,omitempty"`
+	Time         time.Time      `xml:"time,omitempty"`
+	MagVar       Degrees        `xml:"magvar,omitempty"`
+	GeoidHeight  float64        `xml:"geoidheight,omitempty"`
+	Name         string         `xml:"name,omitempty"`
+	Cmt          string         `xml:"cmt,omitempty"`
+	Desc         string         `xml:"desc,omitempty"`
+	Src          string         `xml:"src,omitempty"`
+	Link         []Link         `xml:"link,omitempty"`
+	Sym          string         `xml:"sym,omitempty"`
+	Type         string         `xml:"type,omitempty"`
+	Fix          Fix            `xml:"fix,omitempty"`
+	Sat          uint           `xml:"sat,omitempty"`
+	HDOP         float64        `xml:"hdop,omitempty"`
+	VDOP         float64        `xml:"vdop,omitempty"`
+	PDOP         float64        `xml:"pdop,omitempty"`
+	AgeOfGPSData float64        `xml:"ageofdgpsdata,omitempty"`
+	DGPSID       DGPSStation    `xml:"dgpsid,omitempty"`
+	Extensions   xsd.Extensions `xml:"extensions,omitempty"`
 }
 
-// A geographic point with optional elevation and time.  Available for use by other schemas.
-type PtType struct {
-	Ele  float64   `xml:"http://www.topografix.com/GPX/1/1 ele,omitempty"`
-	Time time.Time `xml:"http://www.topografix.com/GPX/1/1 time,omitempty"`
-	Lat  float64   `xml:"lat,attr"`
-	Lon  float64   `xml:"lon,attr"`
-}
-
-func (t *PtType) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	type T PtType
+func (t *Wpt) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	type T Wpt
 	var layout struct {
 		*T
-		Time *xsd.DateTime `xml:"http://www.topografix.com/GPX/1/1 time,omitempty"`
+		Time *xsd.DateTime `xml:"time,omitempty"`
+	}
+	layout.T = (*T)(t)
+	layout.Time = (*xsd.DateTime)(&layout.T.Time)
+	return e.EncodeElement(layout, start)
+}
+func (t *Wpt) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	type T Wpt
+	var overlay struct {
+		*T
+		Time *xsd.DateTime `xml:"time,omitempty"`
+	}
+	overlay.T = (*T)(t)
+	overlay.Time = (*xsd.DateTime)(&overlay.T.Time)
+	return d.DecodeElement(&overlay, &start)
+}
+
+// rte represents route - an ordered list of waypoints representing a series
+// of turn points leading to a destination.
+type Rte struct {
+	Name       string         `xml:"name,omitempty"`
+	Cmt        string         `xml:"cmt,omitempty"`
+	Desc       string         `xml:"desc,omitempty"`
+	Src        string         `xml:"src,omitempty"`
+	Link       []Link         `xml:"link,omitempty"`
+	Number     uint           `xml:"number,omitempty"`
+	Type       string         `xml:"type,omitempty"`
+	Extensions xsd.Extensions `xml:"extensions,omitempty"`
+	RtePt      []Wpt          `xml:"rtept,omitempty"`
+}
+
+// trk represents a track - an ordered list of points describing a path.
+type Trk struct {
+	Name       string         `xml:"name,omitempty"`
+	Cmt        string         `xml:"cmt,omitempty"`
+	Desc       string         `xml:"desc,omitempty"`
+	Src        string         `xml:"src,omitempty"`
+	Link       []Link         `xml:"link,omitempty"`
+	Number     uint           `xml:"number,omitempty"`
+	Type       string         `xml:"type,omitempty"`
+	Extensions xsd.Extensions `xml:"extensions,omitempty"`
+	TrkSeg     []TrkSeg       `xml:"trkseg,omitempty"`
+}
+
+// You can add extend GPX by adding your own elements from another schema here.
+//type Extensions interface {
+//}
+
+// A Track Segment holds a list of Track Points which are logically connected
+// in order. To represent a single GPS track where GPS reception was lost, or
+// the GPS receiver was turned off, start a new Track Segment for each
+// continuous span of track data.
+type TrkSeg struct {
+	TrkPt      []Wpt          `xml:"trkpt,omitempty"`
+	Extensions xsd.Extensions `xml:"extensions,omitempty"`
+}
+
+// Information about the copyright holder and any license governing use of
+// this file.  By linking to an appropriate license, you may place your data
+// into the public domain or grant additional usage rights.
+type Copyright struct {
+	Author  string    `xml:"author,attr"`
+	Year    time.Time `xml:"year,omitempty"`
+	License string    `xml:"license,omitempty"`
+}
+
+func (t *Copyright) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	type T Copyright
+	var layout struct {
+		*T
+		Year *xsd.GYear `xml:"year,omitempty"`
+	}
+	layout.T = (*T)(t)
+	layout.Year = (*xsd.GYear)(&layout.T.Year)
+	return e.EncodeElement(layout, start)
+}
+
+func (t *Copyright) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	type T Copyright
+	var overlay struct {
+		*T
+		Year *xsd.GYear `xml:"year,omitempty"`
+	}
+	overlay.T = (*T)(t)
+	overlay.Year = (*xsd.GYear)(&overlay.T.Year)
+	return d.DecodeElement(&overlay, &start)
+}
+
+// A link to an external resource (Web page, digital photo, video clip, etc)
+// with additional information.
+type Link struct {
+	HREF string `xml:"href,attr,omitempty"`
+	Text string `xml:"text,omitempty"`
+	Type string `xml:"type,omitempty"`
+}
+
+// An email address. Broken into two parts (id and domain) to help prevent
+// email harvesting.
+type Email struct {
+	ID     string `xml:"id,attr"`
+	Domain string `xml:"domain,attr"`
+}
+
+// A person or organization.
+type Person struct {
+	Name  string `xml:"name,omitempty"`
+	Email *Email `xml:"email,omitempty"`
+	Link  *Link  `xml:"link,omitempty"`
+}
+
+// A geographic point with optional elevation and time.  Available for use
+// by other schemas.
+type Pt struct {
+	Lat  Latitude  `xml:"lat,attr"`
+	Lon  Longitude `xml:"lon,attr"`
+	Ele  float64   `xml:"ele,omitempty"`
+	Time time.Time `xml:"time,omitempty"`
+}
+
+func (t *Pt) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	type T Pt
+	var layout struct {
+		*T
+		Time *xsd.DateTime `xml:"time,omitempty"`
 	}
 	layout.T = (*T)(t)
 	layout.Time = (*xsd.DateTime)(&layout.T.Time)
 	return e.EncodeElement(layout, start)
 }
 
-func (t *PtType) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	type T PtType
+func (t *Pt) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	type T Pt
 	var overlay struct {
 		*T
-		Time *xsd.DateTime `xml:"http://www.topografix.com/GPX/1/1 time,omitempty"`
+		Time *xsd.DateTime `xml:"time,omitempty"`
 	}
 	overlay.T = (*T)(t)
 	overlay.Time = (*xsd.DateTime)(&overlay.T.Time)
@@ -178,85 +242,23 @@ func (t *PtType) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 }
 
 // An ordered sequence of points.  (for polygons or polylines, e.g.)
-type PtsegType struct {
-	Pt []PtType `xml:"http://www.topografix.com/GPX/1/1 pt,omitempty"`
+type PtSeg struct {
+	Pt []Pt `xml:"pt,omitempty"`
 }
 
-// rte represents route - an ordered list of waypoints representing a series of turn points leading to a destination.
-type RteType struct {
-	Name       string         `xml:"http://www.topografix.com/GPX/1/1 name,omitempty"`
-	Cmt        string         `xml:"http://www.topografix.com/GPX/1/1 cmt,omitempty"`
-	Desc       string         `xml:"http://www.topografix.com/GPX/1/1 desc,omitempty"`
-	Src        string         `xml:"http://www.topografix.com/GPX/1/1 src,omitempty"`
-	Link       []LinkType     `xml:"http://www.topografix.com/GPX/1/1 link,omitempty"`
-	Number     int            `xml:"http://www.topografix.com/GPX/1/1 number,omitempty"`
-	Type       string         `xml:"http://www.topografix.com/GPX/1/1 type,omitempty"`
-	Extensions ExtensionsType `xml:"http://www.topografix.com/GPX/1/1 extensions,omitempty"`
-	Rtept      []WptType      `xml:"http://www.topografix.com/GPX/1/1 rtept,omitempty"`
+// Two lat/lon pairs defining the extent of an element.
+type Bounds struct {
+	MinLat Latitude  `xml:"minlat,attr"`
+	MinLon Longitude `xml:"minlon,attr"`
+	MaxLat Latitude  `xml:"maxlat,attr"`
+	MaxLon Longitude `xml:"maxlon,attr"`
 }
 
-// trk represents a track - an ordered list of points describing a path.
-type TrkType struct {
-	Name       string         `xml:"http://www.topografix.com/GPX/1/1 name,omitempty"`
-	Cmt        string         `xml:"http://www.topografix.com/GPX/1/1 cmt,omitempty"`
-	Desc       string         `xml:"http://www.topografix.com/GPX/1/1 desc,omitempty"`
-	Src        string         `xml:"http://www.topografix.com/GPX/1/1 src,omitempty"`
-	Link       []LinkType     `xml:"http://www.topografix.com/GPX/1/1 link,omitempty"`
-	Number     int            `xml:"http://www.topografix.com/GPX/1/1 number,omitempty"`
-	Type       string         `xml:"http://www.topografix.com/GPX/1/1 type,omitempty"`
-	Extensions ExtensionsType `xml:"http://www.topografix.com/GPX/1/1 extensions,omitempty"`
-	Trkseg     []TrksegType   `xml:"http://www.topografix.com/GPX/1/1 trkseg,omitempty"`
-}
-
-// A Track Segment holds a list of Track Points which are logically connected in order. To represent a single GPS track where GPS reception was lost, or the GPS receiver was turned off, start a new Track Segment for each continuous span of track data.
-type TrksegType struct {
-	Trkpt      []WptType      `xml:"http://www.topografix.com/GPX/1/1 trkpt,omitempty"`
-	Extensions ExtensionsType `xml:"http://www.topografix.com/GPX/1/1 extensions,omitempty"`
-}
-
-// wpt represents a waypoint, point of interest, or named feature on a map.
-type WptType struct {
-	Ele           float64        `xml:"http://www.topografix.com/GPX/1/1 ele,omitempty"`
-	Time          time.Time      `xml:"http://www.topografix.com/GPX/1/1 time,omitempty"`
-	Magvar        float64        `xml:"http://www.topografix.com/GPX/1/1 magvar,omitempty"`
-	Geoidheight   float64        `xml:"http://www.topografix.com/GPX/1/1 geoidheight,omitempty"`
-	Name          string         `xml:"http://www.topografix.com/GPX/1/1 name,omitempty"`
-	Cmt           string         `xml:"http://www.topografix.com/GPX/1/1 cmt,omitempty"`
-	Desc          string         `xml:"http://www.topografix.com/GPX/1/1 desc,omitempty"`
-	Src           string         `xml:"http://www.topografix.com/GPX/1/1 src,omitempty"`
-	Link          []LinkType     `xml:"http://www.topografix.com/GPX/1/1 link,omitempty"`
-	Sym           string         `xml:"http://www.topografix.com/GPX/1/1 sym,omitempty"`
-	Type          string         `xml:"http://www.topografix.com/GPX/1/1 type,omitempty"`
-	Fix           FixType        `xml:"http://www.topografix.com/GPX/1/1 fix,omitempty"`
-	Sat           int            `xml:"http://www.topografix.com/GPX/1/1 sat,omitempty"`
-	Hdop          float64        `xml:"http://www.topografix.com/GPX/1/1 hdop,omitempty"`
-	Vdop          float64        `xml:"http://www.topografix.com/GPX/1/1 vdop,omitempty"`
-	Pdop          float64        `xml:"http://www.topografix.com/GPX/1/1 pdop,omitempty"`
-	Ageofdgpsdata float64        `xml:"http://www.topografix.com/GPX/1/1 ageofdgpsdata,omitempty"`
-	Dgpsid        int            `xml:"http://www.topografix.com/GPX/1/1 dgpsid,omitempty"`
-	Extensions    ExtensionsType `xml:"http://www.topografix.com/GPX/1/1 extensions,omitempty"`
-	Lat           float64        `xml:"lat,attr"`
-	Lon           float64        `xml:"lon,attr"`
-}
-
-func (t *WptType) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	type T WptType
-	var layout struct {
-		*T
-		Time *xsd.DateTime `xml:"http://www.topografix.com/GPX/1/1 time,omitempty"`
-	}
-	layout.T = (*T)(t)
-	layout.Time = (*xsd.DateTime)(&layout.T.Time)
-	return e.EncodeElement(layout, start)
-}
-
-func (t *WptType) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	type T WptType
-	var overlay struct {
-		*T
-		Time *xsd.DateTime `xml:"http://www.topografix.com/GPX/1/1 time,omitempty"`
-	}
-	overlay.T = (*T)(t)
-	overlay.Time = (*xsd.DateTime)(&overlay.T.Time)
-	return d.DecodeElement(&overlay, &start)
-}
+// Simple types
+type (
+	Latitude    float64 // The latitude of the point. Decimal degrees, WGS84 datum.
+	Longitude   float64 // The longitude of the point. Decimal degrees, WGS84 datum.
+	Degrees     float64 // Used for bearing, heading, course. Units are decimal degrees, true (not magnetic).
+	Fix         string  // See below
+	DGPSStation int     // Represents a differential GPS station.
+)
