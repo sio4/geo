@@ -3,18 +3,24 @@
 
 package gpx
 
-import "github.com/sio4/geo/xsd"
+import (
+	"encoding/xml"
 
-// This type contains data fields that cannot
-// be represented in track points in GPX 1.1 instances.
+	"github.com/sio4/geo/xsd"
+)
+
+// This type contains data fields that cannot be represented in track points
+// in GPX 1.1 instances.
 type TrackPointExtension struct {
-	Atemp      float64        `xml:"http://www.garmin.com/xmlschemas/TrackPointExtension/v2 atemp,omitempty"`
-	Wtemp      float64        `xml:"http://www.garmin.com/xmlschemas/TrackPointExtension/v2 wtemp,omitempty"`
-	Depth      float64        `xml:"http://www.garmin.com/xmlschemas/TrackPointExtension/v2 depth,omitempty"`
-	Hr         byte           `xml:"http://www.garmin.com/xmlschemas/TrackPointExtension/v2 hr,omitempty"`
-	Cad        byte           `xml:"http://www.garmin.com/xmlschemas/TrackPointExtension/v2 cad,omitempty"`
-	Speed      float64        `xml:"http://www.garmin.com/xmlschemas/TrackPointExtension/v2 speed,omitempty"`
-	Course     float64        `xml:"http://www.garmin.com/xmlschemas/TrackPointExtension/v2 course,omitempty"`
-	Bearing    float64        `xml:"http://www.garmin.com/xmlschemas/TrackPointExtension/v2 bearing,omitempty"`
-	Extensions xsd.Extensions `xml:"http://www.garmin.com/xmlschemas/TrackPointExtension/v2 Extensions,omitempty"`
+	XMLName xml.Name `xml:"http://www.garmin.com/xmlschemas/TrackPointExtension/v2 TrackPointExtension,omitempty"`
+
+	ATemp      float64        `xml:"atemp,omitempty"`   // degrees celsius
+	WTemp      float64        `xml:"wtemp,omitempty"`   // degrees celsius
+	Depth      float64        `xml:"depth,omitempty"`   // meters
+	HR         uint           `xml:"hr,omitempty"`      // beats per minute
+	Cad        uint           `xml:"cad,omitempty"`     // revolutions per minute
+	Speed      float64        `xml:"speed,omitempty"`   // meters per second
+	Course     float64        `xml:"course,omitempty"`  // degrees in a clockwise direction from the true north line
+	Bearing    float64        `xml:"bearing,omitempty"` // degrees in a clockwise direction from the true north line
+	Extensions xsd.Extensions `xml:"Extensions,omitempty"`
 }

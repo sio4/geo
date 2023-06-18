@@ -24,29 +24,30 @@ const (
 // tracks.  You can add your own elements to the extensions section of the GPX
 // document.
 type GPX struct {
-	XMLName    xml.Name       `xml:"http://www.topografix.com/GPX/1/1 gpx"`
-	Version    string         `xml:"version,attr"`
-	Creator    string         `xml:"creator,attr"`
-	Metadata   *Metadata      `xml:"metadata,omitempty"`
-	Wpt        []Wpt          `xml:"wpt,omitempty"`
-	Rte        []Rte          `xml:"rte,omitempty"`
-	Trk        []Trk          `xml:"trk,omitempty"`
-	Extensions xsd.Extensions `xml:"extensions,omitempty"`
+	XMLName xml.Name `xml:"http://www.topografix.com/GPX/1/1 gpx"`
+	Version string   `xml:"version,attr"` // should be 1.1
+	Creator string   `xml:"creator,attr"`
+
+	Metadata   *Metadata   `xml:"metadata,omitempty"`
+	Wpt        []Wpt       `xml:"wpt,omitempty"`
+	Rte        []Rte       `xml:"rte,omitempty"`
+	Trk        []Trk       `xml:"trk,omitempty"`
+	Extensions *Extensions `xml:"extensions,omitempty"`
 }
 
 // Information about the GPX file, author, and copyright restrictions goes in
 // the metadata section.  Providing rich, meaningful information about your
 // GPX files allows others to search for and use your GPS data.
 type Metadata struct {
-	Name       string         `xml:"name,omitempty"`
-	Desc       string         `xml:"desc,omitempty"`
-	Author     *Person        `xml:"author,omitempty"`
-	Copyright  *Copyright     `xml:"copyright,omitempty"`
-	Link       []Link         `xml:"link,omitempty"`
-	Time       time.Time      `xml:"time,omitempty"`
-	Keywords   string         `xml:"keywords,omitempty"`
-	Bounds     *Bounds        `xml:"bounds,omitempty"`
-	Extensions xsd.Extensions `xml:"extensions,omitempty"`
+	Name       string      `xml:"name,omitempty"`
+	Desc       string      `xml:"desc,omitempty"`
+	Author     *Person     `xml:"author,omitempty"`
+	Copyright  *Copyright  `xml:"copyright,omitempty"`
+	Link       []Link      `xml:"link,omitempty"`
+	Time       time.Time   `xml:"time,omitempty"`
+	Keywords   string      `xml:"keywords,omitempty"`
+	Bounds     *Bounds     `xml:"bounds,omitempty"`
+	Extensions *Extensions `xml:"extensions,omitempty"`
 }
 
 func (t *Metadata) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
@@ -73,27 +74,28 @@ func (t *Metadata) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 
 // wpt represents a waypoint, point of interest, or named feature on a map.
 type Wpt struct {
-	Lat          Latitude       `xml:"lat,attr"`
-	Lon          Longitude      `xml:"lon,attr"`
-	Ele          float64        `xml:"ele,omitempty"`
-	Time         time.Time      `xml:"time,omitempty"`
-	MagVar       Degrees        `xml:"magvar,omitempty"`
-	GeoidHeight  float64        `xml:"geoidheight,omitempty"`
-	Name         string         `xml:"name,omitempty"`
-	Cmt          string         `xml:"cmt,omitempty"`
-	Desc         string         `xml:"desc,omitempty"`
-	Src          string         `xml:"src,omitempty"`
-	Link         []Link         `xml:"link,omitempty"`
-	Sym          string         `xml:"sym,omitempty"`
-	Type         string         `xml:"type,omitempty"`
-	Fix          Fix            `xml:"fix,omitempty"`
-	Sat          uint           `xml:"sat,omitempty"`
-	HDOP         float64        `xml:"hdop,omitempty"`
-	VDOP         float64        `xml:"vdop,omitempty"`
-	PDOP         float64        `xml:"pdop,omitempty"`
-	AgeOfGPSData float64        `xml:"ageofdgpsdata,omitempty"`
-	DGPSID       DGPSStation    `xml:"dgpsid,omitempty"`
-	Extensions   xsd.Extensions `xml:"extensions,omitempty"`
+	Lat Latitude  `xml:"lat,attr"` // The latitude of the point. Decimal degrees, WGS84 datum.
+	Lon Longitude `xml:"lon,attr"` // The longitude of the point. Decimal degrees, WGS84 datum.
+
+	Ele          float64     `xml:"ele,omitempty"` // Elevation (in meters) of the point.
+	Time         time.Time   `xml:"time,omitempty"`
+	MagVar       Degrees     `xml:"magvar,omitempty"`
+	GeoidHeight  float64     `xml:"geoidheight,omitempty"` // Height (in meters) of geoid (mean sea level) above WGS84 earth ellipsoid. As defined in NMEA GGA message.
+	Name         string      `xml:"name,omitempty"`
+	Cmt          string      `xml:"cmt,omitempty"`
+	Desc         string      `xml:"desc,omitempty"`
+	Src          string      `xml:"src,omitempty"`
+	Link         []Link      `xml:"link,omitempty"`
+	Sym          string      `xml:"sym,omitempty"`
+	Type         string      `xml:"type,omitempty"`
+	Fix          Fix         `xml:"fix,omitempty"`           // Type of GPX fix.
+	Sat          uint        `xml:"sat,omitempty"`           // Number of satellites used to calculate the GPX fix.
+	HDOP         float64     `xml:"hdop,omitempty"`          // Horizontal dilution of precision.
+	VDOP         float64     `xml:"vdop,omitempty"`          // Vertical dilution of precision.
+	PDOP         float64     `xml:"pdop,omitempty"`          // Position dilution of precision.
+	AgeOfGPSData float64     `xml:"ageofdgpsdata,omitempty"` // Number of seconds since last DGPS update.
+	DGPSID       DGPSStation `xml:"dgpsid,omitempty"`        // ID of DGPS station used in differential correction.
+	Extensions   *Extensions `xml:"extensions,omitempty"`
 }
 
 func (t *Wpt) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
@@ -106,6 +108,7 @@ func (t *Wpt) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	layout.Time = (*xsd.DateTime)(&layout.T.Time)
 	return e.EncodeElement(layout, start)
 }
+
 func (t *Wpt) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	type T Wpt
 	var overlay struct {
@@ -120,50 +123,51 @@ func (t *Wpt) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 // rte represents route - an ordered list of waypoints representing a series
 // of turn points leading to a destination.
 type Rte struct {
-	Name       string         `xml:"name,omitempty"`
-	Cmt        string         `xml:"cmt,omitempty"`
-	Desc       string         `xml:"desc,omitempty"`
-	Src        string         `xml:"src,omitempty"`
-	Link       []Link         `xml:"link,omitempty"`
-	Number     uint           `xml:"number,omitempty"`
-	Type       string         `xml:"type,omitempty"`
-	Extensions xsd.Extensions `xml:"extensions,omitempty"`
-	RtePt      []Wpt          `xml:"rtept,omitempty"`
+	Name       string      `xml:"name,omitempty"`
+	Cmt        string      `xml:"cmt,omitempty"`
+	Desc       string      `xml:"desc,omitempty"`
+	Src        string      `xml:"src,omitempty"`
+	Link       []Link      `xml:"link,omitempty"`
+	Number     uint        `xml:"number,omitempty"`
+	Type       string      `xml:"type,omitempty"`
+	Extensions *Extensions `xml:"extensions,omitempty"`
+	RtePt      []Wpt       `xml:"rtept,omitempty"`
 }
 
 // trk represents a track - an ordered list of points describing a path.
 type Trk struct {
-	Name       string         `xml:"name,omitempty"`
-	Cmt        string         `xml:"cmt,omitempty"`
-	Desc       string         `xml:"desc,omitempty"`
-	Src        string         `xml:"src,omitempty"`
-	Link       []Link         `xml:"link,omitempty"`
-	Number     uint           `xml:"number,omitempty"`
-	Type       string         `xml:"type,omitempty"`
-	Extensions xsd.Extensions `xml:"extensions,omitempty"`
-	TrkSeg     []TrkSeg       `xml:"trkseg,omitempty"`
+	Name       string      `xml:"name,omitempty"`
+	Cmt        string      `xml:"cmt,omitempty"`
+	Desc       string      `xml:"desc,omitempty"`
+	Src        string      `xml:"src,omitempty"`
+	Link       []Link      `xml:"link,omitempty"`
+	Number     uint        `xml:"number,omitempty"` // GPS track number.
+	Type       string      `xml:"type,omitempty"`
+	Extensions *Extensions `xml:"extensions,omitempty"`
+	TrkSeg     []TrkSeg    `xml:"trkseg,omitempty"`
 }
 
 // You can add extend GPX by adding your own elements from another schema here.
-//type Extensions interface {
-//}
+type Extensions struct {
+}
 
 // A Track Segment holds a list of Track Points which are logically connected
 // in order. To represent a single GPS track where GPS reception was lost, or
 // the GPS receiver was turned off, start a new Track Segment for each
 // continuous span of track data.
 type TrkSeg struct {
-	TrkPt      []Wpt          `xml:"trkpt,omitempty"`
-	Extensions xsd.Extensions `xml:"extensions,omitempty"`
+	TrkPt      []Wpt       `xml:"trkpt,omitempty"`
+	Extensions *Extensions `xml:"extensions,omitempty"`
 }
 
 // Information about the copyright holder and any license governing use of
 // this file.  By linking to an appropriate license, you may place your data
 // into the public domain or grant additional usage rights.
 type Copyright struct {
-	Author  string    `xml:"author,attr"`
+	Author string `xml:"author,attr"`
+
 	Year    time.Time `xml:"year,omitempty"`
-	License string    `xml:"license,omitempty"`
+	License string    `xml:"license,omitempty"` // Link to external file containing license text
 }
 
 func (t *Copyright) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
@@ -191,7 +195,8 @@ func (t *Copyright) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 // A link to an external resource (Web page, digital photo, video clip, etc)
 // with additional information.
 type Link struct {
-	HREF string `xml:"href,attr,omitempty"`
+	HRef string `xml:"href,attr"`
+
 	Text string `xml:"text,omitempty"`
 	Type string `xml:"type,omitempty"`
 }
@@ -213,10 +218,11 @@ type Person struct {
 // A geographic point with optional elevation and time.  Available for use
 // by other schemas.
 type Pt struct {
-	Lat  Latitude  `xml:"lat,attr"`
-	Lon  Longitude `xml:"lon,attr"`
-	Ele  float64   `xml:"ele,omitempty"`
-	Time time.Time `xml:"time,omitempty"`
+	Lat Latitude  `xml:"lat,attr"`
+	Lon Longitude `xml:"lon,attr"`
+
+	Ele  float64   `xml:"ele,omitempty"`  // The elevation (in meters) of the point.
+	Time time.Time `xml:"time,omitempty"` // The time that the point was recorded.
 }
 
 func (t *Pt) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
